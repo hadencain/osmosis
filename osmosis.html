@@ -123,10 +123,11 @@
         <div style="border:1px solid #ffffff;width:100%;height:10px;margin-bottom:20px;">
             <div id="meterBar" style="height:100%;background:#ffffff;width:0%;transition:width 0.4s;"></div>
         </div>
-        <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
             <button id="dirAtoB" class="dir-btn">A→B</button>
             <button id="dirBidi" class="dir-btn active">BIDI</button>
             <button id="dirBtoA" class="dir-btn">B→A</button>
+            <button id="loopBtn" class="dir-btn" style="margin-left:auto;">LOOP: OFF</button>
         </div>
         <button id="resetBtn">RESET</button>
         <div style="display:flex;align-items:center;gap:10px;margin-top:16px;">
@@ -225,7 +226,17 @@
 
         function renderFrame(timestamp) {
             requestAnimationFrame(renderFrame);
-            if (!isPlaying || !bufInitialized) return;
+            if (!isPlaying) return;
+
+            // Init buffer on first live frame so drawImage gets a real decoded frame
+            if (!bufInitialized) {
+                ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
+                contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
+                originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
+                bufInitialized = true;
+                displayCtx.putImageData(contaminationBuffer, 0, 0);
+                return;
+            }
 
             if (lastFrameTime > 0) {
                 const delta = timestamp - lastFrameTime;
@@ -335,7 +346,6 @@
 
         playBtn.addEventListener('click', () => {
             if (!isPlaying) {
-                if (!bufInitialized) initBuffer();
                 videoA.play();
                 videoB.play();
                 isPlaying = true;
@@ -391,11 +401,27 @@
             else stopRecording();
         });
 
-        // Freeze shorter video at its last frame instead of looping
+        let loopEnabled = false;
         videoA.removeAttribute('loop');
         videoB.removeAttribute('loop');
-        videoA.addEventListener('ended', () => videoA.pause());
-        videoB.addEventListener('ended', () => videoB.pause());
+
+        function handleEnded(video) {
+            if (loopEnabled) {
+                video.currentTime = 0;
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+
+        videoA.addEventListener('ended', () => handleEnded(videoA));
+        videoB.addEventListener('ended', () => handleEnded(videoB));
+
+        document.getElementById('loopBtn').addEventListener('click', function() {
+            loopEnabled = !loopEnabled;
+            this.textContent = loopEnabled ? 'LOOP: ON' : 'LOOP: OFF';
+            this.classList.toggle('active', loopEnabled);
+        });
     </script>
 </body>
 </html>
