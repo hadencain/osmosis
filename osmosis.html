@@ -5,28 +5,119 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSMOSIS.EXE</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0a; color: #ffffff; font-family: monospace; min-height: 100vh; display: flex; justify-content: center; padding: 40px 20px; }
-        #app { width: 100%; max-width: 960px; }
+
+        body {
+            font-family: 'Courier Prime', monospace;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 960px;
+            border: 2px solid #ffffff;
+            padding: 24px;
+            position: relative;
+            box-shadow: 0 0 24px rgba(255, 255, 255, 0.06);
+        }
+
+        #app::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 255, 255, 0.015) 2px,
+                rgba(255, 255, 255, 0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #app > * { position: relative; z-index: 11; }
+
+        h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.15em; margin-bottom: 24px; }
+
         .drop-zones { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-        .drop-zone { border: 2px solid #ffffff; padding: 32px 20px; text-align: center; cursor: pointer; font-size: 13px; letter-spacing: 0.1em; user-select: none; }
-        .drop-zone.waiting { opacity: 0.45; }
+
+        .drop-zone {
+            border: 2px solid #ffffff;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 13px;
+            letter-spacing: 0.1em;
+            transition: background 0.1s;
+            user-select: none;
+        }
+
+        .drop-zone:hover { background: rgba(255, 255, 255, 0.04); }
+        .drop-zone.waiting { opacity: 0.4; }
+
+        #display { display: block; width: 100%; border: 2px solid #ffffff; margin-bottom: 12px; }
+
+        .dir-btn, button {
+            background: none;
+            border: 2px solid #ffffff;
+            color: #ffffff;
+            font-family: 'Courier Prime', monospace;
+            font-size: 12px;
+            padding: 6px 12px;
+            cursor: pointer;
+            letter-spacing: 0.08em;
+            transition: background 0.1s, color 0.1s;
+        }
+
+        button:hover, .dir-btn:hover { background: rgba(255, 255, 255, 0.08); }
         button:disabled { opacity: 0.3; cursor: not-allowed; }
-        .dir-btn { background: none; border: 2px solid #ffffff; color: #ffffff; font-family: monospace; font-size: 12px; padding: 6px 12px; cursor: pointer; letter-spacing: 0.08em; }
         .dir-btn.active { background: #ffffff; color: #0a0a0a; }
-        input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; height: 2px; background: #ffffff; outline: none; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: #ffffff; cursor: pointer; border: 2px solid #0a0a0a; outline: 2px solid #ffffff; }
-        input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: #ffffff; cursor: pointer; border: 2px solid #0a0a0a; outline: 2px solid #ffffff; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 160px;
+            height: 2px;
+            background: #ffffff;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #ffffff;
+            cursor: pointer;
+            border: 2px solid #0a0a0a;
+            outline: 2px solid #ffffff;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #ffffff;
+            cursor: pointer;
+            border: 2px solid #0a0a0a;
+            outline: 2px solid #ffffff;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <h1 style="font-size:20px;letter-spacing:0.15em;margin-bottom:24px;">OSMOSIS.EXE</h1>
+        <h1>OSMOSIS.EXE</h1>
         <div class="drop-zones">
             <div id="dropA" class="drop-zone waiting">[ DROP VIDEO A ]</div>
             <div id="dropB" class="drop-zone waiting">[ DROP VIDEO B ]</div>
         </div>
-        <canvas id="display" style="display:block;width:100%;border:2px solid #ffffff;margin-bottom:12px;"></canvas>
+        <canvas id="display"></canvas>
         <div id="meterLabel" style="font-size:12px;letter-spacing:0.1em;margin-bottom:6px;">CONTAMINATION: 0%</div>
         <div style="border:1px solid #ffffff;width:100%;height:10px;margin-bottom:20px;">
             <div id="meterBar" style="height:100%;background:#ffffff;width:0%;transition:width 0.4s;"></div>
@@ -43,6 +134,9 @@
             <span id="bleedDisplay" style="font-size:11px;letter-spacing:0.06em;">0.010</span>
         </div>
         <button id="playBtn" disabled>PLAY</button>
+        <div id="debugPanel" style="font-size:11px;opacity:0.4;letter-spacing:0.06em;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.15);">
+            bleed=0.010 &nbsp; fps=— &nbsp; contamination=0%
+        </div>
     </div>
 
     <input type="file" id="fileA" accept="video/*" style="display:none">
@@ -155,12 +249,18 @@
 
         const meterLabel = document.getElementById('meterLabel');
         const meterBar = document.getElementById('meterBar');
+        const debugPanel = document.getElementById('debugPanel');
+
+        function updateDebug(pct) {
+            debugPanel.innerHTML = `bleed=${bleedRate.toFixed(3)} &nbsp; fps=${currentFps || '—'} &nbsp; contamination=${pct}%`;
+        }
 
         setInterval(() => {
             if (!isPlaying || !bufInitialized) return;
             const pct = Math.round(computeContaminationPercent() * 100);
             meterLabel.textContent = `CONTAMINATION: ${pct}%`;
             meterBar.style.width = `${pct}%`;
+            updateDebug(pct);
         }, 1000);
 
         const dirMap = {
