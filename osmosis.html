@@ -54,12 +54,70 @@
         let bufInitialized = false;
         let originalSnapshot = null; // pixel snapshot of videoA at buffer init — used by contamination meter
 
+        let bleedRate = 0.01;
+        let direction = 'BIDIRECTIONAL'; // 'A_TO_B' | 'B_TO_A' | 'BIDIRECTIONAL'
+        let lastFrameTime = 0;
+        let currentFps = 0;
+        let frameSkipActive = false;
+        let frameSkipToggle = false;
+
         function initBuffer() {
             ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
             contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
             originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
             bufInitialized = true;
         }
+
+        function bleedPixels(dataA, dataB, buf) {
+            for (let i = 0; i < INTERNAL_W * INTERNAL_H; i++) {
+                const r = i * 4, g = r + 1, b = r + 2;
+                const lumA = 0.299 * dataA[r] + 0.587 * dataA[g] + 0.114 * dataA[b];
+                const lumB = 0.299 * dataB[r] + 0.587 * dataB[g] + 0.114 * dataB[b];
+
+                if ((direction === 'A_TO_B' || direction === 'BIDIRECTIONAL') && lumA > lumB) {
+                    const t = bleedRate * ((lumA - lumB) / 255);
+                    buf[r] += (dataA[r] - buf[r]) * t;
+                    buf[g] += (dataA[g] - buf[g]) * t;
+                    buf[b] += (dataA[b] - buf[b]) * t;
+                }
+                if ((direction === 'B_TO_A' || direction === 'BIDIRECTIONAL') && lumB > lumA) {
+                    const t = bleedRate * ((lumB - lumA) / 255);
+                    buf[r] += (dataB[r] - buf[r]) * t;
+                    buf[g] += (dataB[g] - buf[g]) * t;
+                    buf[b] += (dataB[b] - buf[b]) * t;
+                }
+            }
+        }
+
+        function renderFrame(timestamp) {
+            requestAnimationFrame(renderFrame);
+            if (!isPlaying || !bufInitialized) return;
+
+            if (lastFrameTime > 0) {
+                const delta = timestamp - lastFrameTime;
+                currentFps = Math.round(1000 / delta);
+                frameSkipActive = currentFps < 25;
+            }
+            lastFrameTime = timestamp;
+
+            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
+            ctxB.drawImage(videoB, 0, 0, INTERNAL_W, INTERNAL_H);
+
+            const dataA = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H).data;
+            const dataB = ctxB.getImageData(0, 0, INTERNAL_W, INTERNAL_H).data;
+            const buf = contaminationBuffer.data;
+
+            if (frameSkipActive) {
+                frameSkipToggle = !frameSkipToggle;
+                if (!frameSkipToggle) bleedPixels(dataA, dataB, buf);
+            } else {
+                bleedPixels(dataA, dataB, buf);
+            }
+
+            displayCtx.putImageData(contaminationBuffer, 0, 0);
+        }
+
+        requestAnimationFrame(renderFrame);
 
         function checkReady() {
             if (readyA && readyB) playBtn.disabled = false;
@@ -97,6 +155,7 @@
 
         playBtn.addEventListener('click', () => {
             if (!isPlaying) {
+                if (!bufInitialized) initBuffer();
                 videoA.play();
                 videoB.play();
                 isPlaying = true;
