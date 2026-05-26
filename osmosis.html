@@ -33,6 +33,7 @@
             <button id="dirBidi" class="dir-btn active">BIDI</button>
             <button id="dirBtoA" class="dir-btn">B→A</button>
         </div>
+        <button id="resetBtn">RESET</button>
         <button id="playBtn" disabled>PLAY</button>
     </div>
 
@@ -166,6 +167,13 @@
                 Object.values(dirMap).forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (!bufInitialized) return;
+            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
+            contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
+            originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
         });
 
         function checkReady() {
