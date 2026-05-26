@@ -14,6 +14,9 @@
         button:disabled { opacity: 0.3; cursor: not-allowed; }
         .dir-btn { background: none; border: 2px solid #ffffff; color: #ffffff; font-family: monospace; font-size: 12px; padding: 6px 12px; cursor: pointer; letter-spacing: 0.08em; }
         .dir-btn.active { background: #ffffff; color: #0a0a0a; }
+        input[type="range"] { -webkit-appearance: none; appearance: none; width: 160px; height: 2px; background: #ffffff; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: #ffffff; cursor: pointer; border: 2px solid #0a0a0a; outline: 2px solid #ffffff; }
+        input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: #ffffff; cursor: pointer; border: 2px solid #0a0a0a; outline: 2px solid #ffffff; }
     </style>
 </head>
 <body>
@@ -34,6 +37,11 @@
             <button id="dirBtoA" class="dir-btn">B→A</button>
         </div>
         <button id="resetBtn">RESET</button>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:16px;">
+            <span style="font-size:11px;letter-spacing:0.08em;opacity:0.6;">BLEED</span>
+            <input type="range" id="bleedSlider" min="0.001" max="0.1" step="0.001" value="0.01">
+            <span id="bleedDisplay" style="font-size:11px;letter-spacing:0.06em;">0.010</span>
+        </div>
         <button id="playBtn" disabled>PLAY</button>
     </div>
 
@@ -174,6 +182,14 @@
             ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
             contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
             originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
+        });
+
+        const bleedSlider = document.getElementById('bleedSlider');
+        const bleedDisplay = document.getElementById('bleedDisplay');
+
+        bleedSlider.addEventListener('input', () => {
+            bleedRate = parseFloat(bleedSlider.value);
+            bleedDisplay.textContent = bleedRate.toFixed(3);
         });
 
         function checkReady() {
