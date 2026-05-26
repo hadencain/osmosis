@@ -21,6 +21,7 @@
             <div id="dropA" class="drop-zone waiting">[ DROP VIDEO A ]</div>
             <div id="dropB" class="drop-zone waiting">[ DROP VIDEO B ]</div>
         </div>
+        <canvas id="display" style="display:block;width:100%;border:2px solid #ffffff;margin-bottom:12px;"></canvas>
         <button id="playBtn" disabled>PLAY</button>
     </div>
 
@@ -36,6 +37,29 @@
 
         let readyA = false, readyB = false;
         let isPlaying = false;
+
+        const INTERNAL_W = 854, INTERNAL_H = 480;
+
+        const displayCanvas = document.getElementById('display');
+        const displayCtx = displayCanvas.getContext('2d');
+        displayCanvas.width = INTERNAL_W;
+        displayCanvas.height = INTERNAL_H;
+
+        const offA = new OffscreenCanvas(INTERNAL_W, INTERNAL_H);
+        const offB = new OffscreenCanvas(INTERNAL_W, INTERNAL_H);
+        const ctxA = offA.getContext('2d');
+        const ctxB = offB.getContext('2d');
+
+        let contaminationBuffer = null;
+        let bufInitialized = false;
+        let originalSnapshot = null; // pixel snapshot of videoA at buffer init — used by contamination meter
+
+        function initBuffer() {
+            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
+            contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
+            originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
+            bufInitialized = true;
+        }
 
         function checkReady() {
             if (readyA && readyB) playBtn.disabled = false;
