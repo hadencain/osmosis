@@ -80,6 +80,7 @@
         button:hover, .dir-btn:hover { background: rgba(255, 255, 255, 0.08); }
         button:disabled { opacity: 0.3; cursor: not-allowed; }
         .dir-btn.active { background: #ffffff; color: #0a0a0a; }
+        button.active { background: #ffffff; color: #0a0a0a; }
 
         input[type="range"] {
             -webkit-appearance: none;
@@ -134,6 +135,7 @@
             <span id="bleedDisplay" style="font-size:11px;letter-spacing:0.06em;">0.010</span>
         </div>
         <button id="playBtn" disabled>PLAY</button>
+        <button id="recBtn" disabled style="margin-left:8px;">REC</button>
         <div id="debugPanel" style="font-size:11px;opacity:0.4;letter-spacing:0.06em;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.15);">
             bleed=0.010 &nbsp; fps=— &nbsp; contamination=0%
         </div>
@@ -148,6 +150,10 @@
         const videoA = document.getElementById('videoA');
         const videoB = document.getElementById('videoB');
         const playBtn = document.getElementById('playBtn');
+        const recBtn = document.getElementById('recBtn');
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
 
         let readyA = false, readyB = false;
         let isPlaying = false;
@@ -333,12 +339,53 @@
                 videoB.play();
                 isPlaying = true;
                 playBtn.textContent = 'STOP';
+                recBtn.disabled = false;
             } else {
+                if (isRecording) stopRecording();
                 videoA.pause();
                 videoB.pause();
                 isPlaying = false;
                 playBtn.textContent = 'PLAY';
+                recBtn.disabled = true;
+                recBtn.textContent = 'REC';
             }
+        });
+
+        function startRecording() {
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                ? 'video/webm;codecs=vp9'
+                : 'video/webm';
+            const stream = displayCanvas.captureStream(30);
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'osmosis.webm';
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+            mediaRecorder.start();
+            isRecording = true;
+            recBtn.textContent = 'STOP REC';
+            recBtn.classList.add('active');
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            isRecording = false;
+            recBtn.textContent = 'REC';
+            recBtn.classList.remove('active');
+        }
+
+        recBtn.addEventListener('click', () => {
+            if (!isRecording) startRecording();
+            else stopRecording();
         });
 
         // Freeze shorter video at its last frame instead of looping
