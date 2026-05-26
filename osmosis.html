@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSMOSIS.EXE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #ffffff; font-family: monospace; min-height: 100vh; display: flex; justify-content: center; padding: 40px 20px; }
+        #app { width: 100%; max-width: 960px; }
+        .drop-zones { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .drop-zone { border: 2px solid #ffffff; padding: 32px 20px; text-align: center; cursor: pointer; font-size: 13px; letter-spacing: 0.1em; user-select: none; }
+        .drop-zone.waiting { opacity: 0.45; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1 style="font-size:20px;letter-spacing:0.15em;margin-bottom:24px;">OSMOSIS.EXE</h1>
+        <div class="drop-zones">
+            <div id="dropA" class="drop-zone waiting">[ DROP VIDEO A ]</div>
+            <div id="dropB" class="drop-zone waiting">[ DROP VIDEO B ]</div>
+        </div>
+        <button id="playBtn" disabled>PLAY</button>
+    </div>
+
+    <input type="file" id="fileA" accept="video/*" style="display:none">
+    <input type="file" id="fileB" accept="video/*" style="display:none">
+    <video id="videoA" style="display:none" loop crossorigin="anonymous"></video>
+    <video id="videoB" style="display:none" loop crossorigin="anonymous"></video>
+
+    <script>
+        const videoA = document.getElementById('videoA');
+        const videoB = document.getElementById('videoB');
+        const playBtn = document.getElementById('playBtn');
+
+        let readyA = false, readyB = false;
+        let isPlaying = false;
+
+        function checkReady() {
+            if (readyA && readyB) playBtn.disabled = false;
+        }
+
+        function loadVideo(video, file, zone, onReady) {
+            zone.textContent = 'LOADING...';
+            video.src = URL.createObjectURL(file);
+            video.oncanplay = () => {
+                const label = zone.id === 'dropA' ? '[ VIDEO A — READY ]' : '[ VIDEO B — READY ]';
+                zone.textContent = label;
+                zone.classList.remove('waiting');
+                onReady();
+            };
+            video.load();
+        }
+
+        function setupZone(zoneId, fileInputId, video, onReady) {
+            const zone = document.getElementById(zoneId);
+            const input = document.getElementById(fileInputId);
+            zone.addEventListener('click', () => input.click());
+            input.addEventListener('change', e => {
+                if (e.target.files[0]) loadVideo(video, e.target.files[0], zone, onReady);
+            });
+            zone.addEventListener('dragover', e => e.preventDefault());
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('video/')) loadVideo(video, file, zone, onReady);
+            });
+        }
+
+        setupZone('dropA', 'fileA', videoA, () => { readyA = true; checkReady(); });
+        setupZone('dropB', 'fileB', videoB, () => { readyB = true; checkReady(); });
+
+        playBtn.addEventListener('click', () => {
+            if (!isPlaying) {
+                videoA.play();
+                videoB.play();
+                isPlaying = true;
+                playBtn.textContent = 'STOP';
+            } else {
+                videoA.pause();
+                videoB.pause();
+                isPlaying = false;
+                playBtn.textContent = 'PLAY';
+            }
+        });
+
+        // Freeze shorter video at its last frame instead of looping
+        videoA.removeAttribute('loop');
+        videoB.removeAttribute('loop');
+        videoA.addEventListener('ended', () => videoA.pause());
+        videoB.addEventListener('ended', () => videoB.pause());
+    </script>
+</body>
+</html>
