@@ -160,14 +160,15 @@
         let isPlaying = false;
 
         const INTERNAL_W = 854, INTERNAL_H = 480;
+        let WORK_W = INTERNAL_W, WORK_H = INTERNAL_H;
 
         const displayCanvas = document.getElementById('display');
         const displayCtx = displayCanvas.getContext('2d');
-        displayCanvas.width = INTERNAL_W;
-        displayCanvas.height = INTERNAL_H;
+        displayCanvas.width = WORK_W;
+        displayCanvas.height = WORK_H;
 
-        const offA = new OffscreenCanvas(INTERNAL_W, INTERNAL_H);
-        const offB = new OffscreenCanvas(INTERNAL_W, INTERNAL_H);
+        const offA = new OffscreenCanvas(WORK_W, WORK_H);
+        const offB = new OffscreenCanvas(WORK_W, WORK_H);
         const ctxA = offA.getContext('2d');
         const ctxB = offB.getContext('2d');
 
@@ -182,15 +183,38 @@
         let frameSkipActive = false;
         let frameSkipToggle = false;
 
-        function initBuffer() {
-            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
-            contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
-            originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
-            bufInitialized = true;
+        // Called when videoA loads — sets working resolution from videoA's native dimensions
+        function setWorkingResolution() {
+            const vw = videoA.videoWidth;
+            const vh = videoA.videoHeight;
+            if (!vw || !vh) return;
+            const scale = Math.min(INTERNAL_W / vw, INTERNAL_H / vh, 1);
+            WORK_W = Math.round(vw * scale);
+            WORK_H = Math.round(vh * scale);
+            displayCanvas.width = WORK_W;
+            displayCanvas.height = WORK_H;
+            offA.width = WORK_W; offA.height = WORK_H;
+            offB.width = WORK_W; offB.height = WORK_H;
+            bufInitialized = false;
+            contaminationBuffer = null;
+            originalSnapshot = null;
+        }
+
+        // Draws video into ctx letterboxed/pillarboxed to fit WORK_W × WORK_H
+        function drawVideoFit(ctx, video) {
+            const vw = video.videoWidth || WORK_W;
+            const vh = video.videoHeight || WORK_H;
+            const scale = Math.min(WORK_W / vw, WORK_H / vh);
+            const dw = Math.round(vw * scale);
+            const dh = Math.round(vh * scale);
+            const dx = Math.round((WORK_W - dw) / 2);
+            const dy = Math.round((WORK_H - dh) / 2);
+            ctx.clearRect(0, 0, WORK_W, WORK_H);
+            ctx.drawImage(video, dx, dy, dw, dh);
         }
 
         function bleedPixels(dataA, dataB, buf) {
-            for (let i = 0; i < INTERNAL_W * INTERNAL_H; i++) {
+            for (let i = 0; i < WORK_W * WORK_H; i++) {
                 const r = i * 4, g = r + 1, b = r + 2;
                 const lumA = 0.299 * dataA[r] + 0.587 * dataA[g] + 0.114 * dataA[b];
                 const lumB = 0.299 * dataB[r] + 0.587 * dataB[g] + 0.114 * dataB[b];
@@ -215,7 +239,7 @@
             const buf = contaminationBuffer.data;
             let altered = 0;
             for (let i = 0; i < 1000; i++) {
-                const idx = Math.floor(Math.random() * (INTERNAL_W * INTERNAL_H)) * 4;
+                const idx = Math.floor(Math.random() * (WORK_W * WORK_H)) * 4;
                 const dr = Math.abs(buf[idx]   - originalSnapshot[idx]);
                 const dg = Math.abs(buf[idx+1] - originalSnapshot[idx+1]);
                 const db = Math.abs(buf[idx+2] - originalSnapshot[idx+2]);
@@ -230,8 +254,8 @@
 
             // Init buffer on first live frame so drawImage gets a real decoded frame
             if (!bufInitialized) {
-                ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
-                contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
+                ctxA.drawImage(videoA, 0, 0, WORK_W, WORK_H);
+                contaminationBuffer = ctxA.getImageData(0, 0, WORK_W, WORK_H);
                 originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
                 bufInitialized = true;
                 displayCtx.putImageData(contaminationBuffer, 0, 0);
@@ -245,11 +269,11 @@
             }
             lastFrameTime = timestamp;
 
-            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
-            ctxB.drawImage(videoB, 0, 0, INTERNAL_W, INTERNAL_H);
+            ctxA.drawImage(videoA, 0, 0, WORK_W, WORK_H);
+            drawVideoFit(ctxB, videoB);
 
-            const dataA = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H).data;
-            const dataB = ctxB.getImageData(0, 0, INTERNAL_W, INTERNAL_H).data;
+            const dataA = ctxA.getImageData(0, 0, WORK_W, WORK_H).data;
+            const dataB = ctxB.getImageData(0, 0, WORK_W, WORK_H).data;
             const buf = contaminationBuffer.data;
 
             if (frameSkipActive) {
@@ -296,8 +320,8 @@
 
         document.getElementById('resetBtn').addEventListener('click', () => {
             if (!bufInitialized) return;
-            ctxA.drawImage(videoA, 0, 0, INTERNAL_W, INTERNAL_H);
-            contaminationBuffer = ctxA.getImageData(0, 0, INTERNAL_W, INTERNAL_H);
+            ctxA.drawImage(videoA, 0, 0, WORK_W, WORK_H);
+            contaminationBuffer = ctxA.getImageData(0, 0, WORK_W, WORK_H);
             originalSnapshot = new Uint8ClampedArray(contaminationBuffer.data);
         });
 
@@ -341,7 +365,7 @@
             });
         }
 
-        setupZone('dropA', 'fileA', videoA, () => { readyA = true; checkReady(); });
+        setupZone('dropA', 'fileA', videoA, () => { readyA = true; setWorkingResolution(); checkReady(); });
         setupZone('dropB', 'fileB', videoB, () => { readyB = true; checkReady(); });
 
         playBtn.addEventListener('click', () => {
