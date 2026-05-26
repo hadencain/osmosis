@@ -304,6 +304,7 @@
 
         function loadVideo(video, file, zone, onReady) {
             zone.textContent = 'LOADING...';
+            if (video.src && video.src.startsWith('blob:')) URL.revokeObjectURL(video.src);
             video.src = URL.createObjectURL(file);
             video.oncanplay = () => {
                 const label = zone.id === 'dropA' ? '[ VIDEO A — READY ]' : '[ VIDEO B — READY ]';
