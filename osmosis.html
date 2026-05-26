@@ -22,6 +22,10 @@
             <div id="dropB" class="drop-zone waiting">[ DROP VIDEO B ]</div>
         </div>
         <canvas id="display" style="display:block;width:100%;border:2px solid #ffffff;margin-bottom:12px;"></canvas>
+        <div id="meterLabel" style="font-size:12px;letter-spacing:0.1em;margin-bottom:6px;">CONTAMINATION: 0%</div>
+        <div style="border:1px solid #ffffff;width:100%;height:10px;margin-bottom:20px;">
+            <div id="meterBar" style="height:100%;background:#ffffff;width:0%;transition:width 0.4s;"></div>
+        </div>
         <button id="playBtn" disabled>PLAY</button>
     </div>
 
@@ -89,6 +93,20 @@
             }
         }
 
+        function computeContaminationPercent(threshold = 30) {
+            if (!bufInitialized || !originalSnapshot) return 0;
+            const buf = contaminationBuffer.data;
+            let altered = 0;
+            for (let i = 0; i < 1000; i++) {
+                const idx = Math.floor(Math.random() * (INTERNAL_W * INTERNAL_H)) * 4;
+                const dr = Math.abs(buf[idx]   - originalSnapshot[idx]);
+                const dg = Math.abs(buf[idx+1] - originalSnapshot[idx+1]);
+                const db = Math.abs(buf[idx+2] - originalSnapshot[idx+2]);
+                if (dr + dg + db > threshold) altered++;
+            }
+            return altered / 1000;
+        }
+
         function renderFrame(timestamp) {
             requestAnimationFrame(renderFrame);
             if (!isPlaying || !bufInitialized) return;
@@ -118,6 +136,16 @@
         }
 
         requestAnimationFrame(renderFrame);
+
+        const meterLabel = document.getElementById('meterLabel');
+        const meterBar = document.getElementById('meterBar');
+
+        setInterval(() => {
+            if (!isPlaying || !bufInitialized) return;
+            const pct = Math.round(computeContaminationPercent() * 100);
+            meterLabel.textContent = `CONTAMINATION: ${pct}%`;
+            meterBar.style.width = `${pct}%`;
+        }, 1000);
 
         function checkReady() {
             if (readyA && readyB) playBtn.disabled = false;
